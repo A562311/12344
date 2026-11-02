@@ -11,3 +11,4 @@ data/_progress/
 .DS_Store
 Thumbs.db
 *.log
+public/data/
