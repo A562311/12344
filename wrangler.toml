@@ -5,15 +5,16 @@ compatibility_flags = ["nodejs_compat"]
 
 # 静态资源(题库 + 前端)
 [assets]
-directory = "./web"
+directory = "./public"
 binding = "ASSETS"
+# 真实文件直接返回,不存在时交给 Worker 处理(不要 SPA fallback,
+# 否则 admin.html 会被 307 到 index.html)
+not_found_handling = "none"
 
 # KV 存储(用户表 / 会话 / 进度)
-# 创建: wrangler kv namespace create C3_KV
-# 把返回的 id 填到下面
 [[kv_namespaces]]
 binding = "C3_KV"
-id = "REPLACE_WITH_YOUR_KV_ID"
+id = "665dc7304bd1407a9b8015c1e557705b"
 
 [observability]
 enabled = true
