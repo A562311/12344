@@ -20,6 +20,8 @@ HERE = Path(__file__).parent
 SERVER_DIR = HERE / "server"
 PORT = int(os.environ.get("PORT", "8787"))
 SSH_HOST = os.environ.get("SSH_HOST", "serveo.net")
+# SSH 走本地代理(国内直连 serveo.net 常常超时)
+PROXY = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY") or ""
 URL_RE = re.compile(r"https://([a-z0-9-]+(?:-[a-z0-9]+)*\.[a-z0-9.-]*serveo[a-z0-9.-]*\.(?:com|net))")
 
 def start_server():
@@ -94,9 +96,22 @@ def start_tunnel(retries=3):
         "-o", "ExitOnForwardFailure=yes",
         "-o", "ServerAliveInterval=15",
         "-o", "ConnectTimeout=25",
-        "-R", f"80:localhost:{PORT}",
-        SSH_HOST,
     ]
+    # SSH 走本地代理(可选)
+    # 默认直连 —— 实测直连 serveo.net 通常可用,走代理反而可能失败
+    # 需要时: set SSH_USE_PROXY=1
+    if os.environ.get("SSH_USE_PROXY") == "1" and PROXY:
+        m = re.search(r"://([^:/]+):(\d+)", PROXY)
+        if m:
+            phost, pport = m.group(1), m.group(2)
+            proxy_helper = HERE / "ssh_proxy.py"
+            if proxy_helper.exists():
+                cmd += [
+                    "-o",
+                    f'ProxyCommand=python "{proxy_helper}" {phost} {pport} %h %p',
+                ]
+                print(f"  (SSH 经代理 {phost}:{pport})", flush=True)
+    cmd += ["-R", f"80:localhost:{PORT}", SSH_HOST]
 
     for attempt in range(1, retries + 1):
         if attempt > 1:

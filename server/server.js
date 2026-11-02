@@ -369,7 +369,7 @@ const server = http.createServer(async (req, res) => {
             created: u.created,
             answered: st.answered || 0,
             correct: st.correct || 0,
-            accuracy: st.answered ? Math.round(st.correct / st.answered * 100) : 0,
+            accuracy: st.answered ? Math.round((st.correct || 0) / st.answered * 100) : 0,
             sessions: st.sessions || 0,
             wrongCount: p ? Object.keys(p.wrong || {}).length : 0,
             favCount: p ? Object.keys(p.fav || {}).length : 0,
