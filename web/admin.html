@@ -34,7 +34,8 @@ const A = {
   user: null,
   rows: [],
   summary: {},
-  tab: 'progress',   // progress | users
+  tab: 'progress',   // progress | rank | users
+  rankKey: 'answered', // answered | accuracy | sessions | wrong
   search: '',
 };
 
@@ -140,10 +141,12 @@ function render() {
   // Tab
   m.appendChild(el('div', { class: 'tabs' }, [
     el('button', { class: 'tab ' + (A.tab === 'progress' ? 'on' : ''), onclick: () => { A.tab = 'progress'; render(); } }, ['📊 刷题进度']),
+    el('button', { class: 'tab ' + (A.tab === 'rank' ? 'on' : ''), onclick: () => { A.tab = 'rank'; render(); } }, ['🏆 排行榜']),
     el('button', { class: 'tab ' + (A.tab === 'users' ? 'on' : ''), onclick: () => { A.tab = 'users'; render(); } }, ['👥 用户管理']),
   ]));
 
   if (A.tab === 'progress') renderProgressTab(m);
+  else if (A.tab === 'rank') renderRankTab(m);
   else renderUsersTab(m);
 }
 
@@ -154,17 +157,248 @@ function kpi(v, l, c) {
   ]);
 }
 
+// ── 导出 CSV(Excel 可直接打开) ──
+function csvEscape(v) {
+  const s = (v === null || v === undefined) ? '' : String(v);
+  let out = s;
+  // 前导 =+-@ 会被 Excel 当公式,加单引号防注入
+  if (/^[=+\-@]/.test(out)) out = String.fromCharCode(39) + out;
+  // 含逗号/引号/换行 -> 用引号包起来,内部引号翻倍
+  const needsQuote = out.indexOf(String.fromCharCode(34)) >= 0
+    || out.indexOf(String.fromCharCode(44)) >= 0
+    || out.indexOf(String.fromCharCode(10)) >= 0
+    || out.indexOf(String.fromCharCode(13)) >= 0;
+  if (needsQuote) {
+    const q = String.fromCharCode(34);
+    out = q + out.split(q).join(q + q) + q;
+  }
+  return out;
+}
+
+function downloadCSV(filename, headers, rows) {
+  const lines = [headers.map(csvEscape).join(',')];
+  for (const r of rows) lines.push(r.map(csvEscape).join(','));
+  // BOM 让 Excel 正确识别 UTF-8 中文
+  const BOM = String.fromCharCode(0xFEFF);
+  const CRLF = String.fromCharCode(13, 10);
+  const blob = new Blob([BOM + lines.join(CRLF)], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = el('a', { href: url, download: filename });
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+}
+
+function exportProgressCSV() {
+  const rows = A.rows.filter(r => {
+    const q = (A.search || '').trim().toLowerCase();
+    if (!q) return true;
+    return (r.username || '').toLowerCase().includes(q) ||
+           (r.name || '').toLowerCase().includes(q);
+  });
+  const headers = ['排名', '姓名', '用户名', '角色', '状态', '已答题', '答对', '正确率%', '刷题次数', '错题数', '收藏数', '注册时间', '最后登录'];
+  const body = rows.map((r, i) => [
+    i + 1, r.name, r.username,
+    r.role === 'admin' ? '管理员' : '普通用户',
+    r.active ? '正常' : '已禁用',
+    r.answered, r.correct, r.accuracy, r.sessions, r.wrongCount, r.favCount,
+    r.created ? new Date(r.created).toLocaleString('zh-CN') : '',
+    r.lastLogin ? new Date(r.lastLogin).toLocaleString('zh-CN') : '',
+  ]);
+  const stamp = new Date().toISOString().slice(0, 10);
+  downloadCSV(`安全员刷题进度_${stamp}.csv`, headers, body);
+  toast(`已导出 ${rows.length} 条记录`);
+}
+
+// 导出单个用户的错题详情
+function exportWrongCSV(username) {
+  const r = A.rows.find(x => x.username === username);
+  if (!r) return;
+  fetch(`/api/admin/user/${encodeURIComponent(username)}`, {
+    headers: { 'Authorization': 'Bearer ' + A.token }
+  }).then(r => r.ok ? r.json() : r.json().catch(() => ({}))).then(d => {
+    const wrong = d.wrong || (d.progress && d.progress.wrong) || {};
+    const keys = Object.keys(wrong);
+    const headers = ['题号', '错题ID', '题库', '题目', '正确答案', '错次', '答对次数', '最近答错'];
+    const body = keys.map((k, i) => {
+      const w = wrong[k];
+      const opts = (w.o || []).map((o, j) => `${String.fromCharCode(65 + j)}.${o}`).join(' ');
+      return [
+        i + 1, w.qid || k, w.set || '', (w.q || '').replace(/\s+/g, ' '),
+        opts, w.count || 0, w.correctCount || 0,
+        w.lastWrongAt ? new Date(w.lastWrongAt).toLocaleString('zh-CN') : '',
+      ];
+    });
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadCSV(`${r.name || username}_错题本_${stamp}.csv`, headers, body);
+    toast(`已导出 ${keys.length} 道错题`);
+  }).catch(() => toast('导出失败'));
+}
+
+// 导出汇总
+function exportSummaryCSV() {
+  const s = A.summary || {};
+  const headers = ['指标', '数值'];
+  const body = [
+    ['注册用户数', s.users || 0],
+    ['已登录用户数', s.activeUsers || 0],
+    ['累计答题数', s.totalAnswered || 0],
+    ['累计答对数', s.totalCorrect || 0],
+    ['平均正确率%', s.accuracy || 0],
+    ['错题总数', s.totalWrong || 0],
+    ['导出时间', new Date().toLocaleString('zh-CN')],
+  ];
+  const stamp = new Date().toISOString().slice(0, 10);
+  downloadCSV(`安全员刷题汇总_${stamp}.csv`, headers, body);
+  toast('已导出汇总');
+}
+
 function renderProgressTab(m) {
-  // 搜索
+  // 搜索 + 导出
   const search = el('input', {
     class: 'inp', placeholder: '搜索用户名或姓名…', value: A.search,
     oninput: (e) => { A.search = e.target.value; renderTable(); }
   });
-  m.appendChild(el('div', { style: 'margin-bottom:12px' }, [search]));
+  m.appendChild(el('div', { class: 'row-flex', style: 'margin-bottom:12px;gap:8px' }, [
+    el('div', { style: 'flex:1' }, [search]),
+    el('button', { class: 'btn pri sm', onclick: exportProgressCSV }, ['⬇ 导出进度']),
+    el('button', { class: 'btn sm', onclick: exportSummaryCSV }, ['⬇ 汇总']),
+  ]));
 
   const tableBox = el('div', { id: 'tablebox' });
   m.appendChild(tableBox);
   renderTable();
+}
+
+// ── 排行榜 ──
+const RANKS = [
+  { key: 'answered', label: '刷题最多', icon: '📚', desc: '累计答题量', get: r => r.answered || 0 },
+  { key: 'accuracy', label: '正确率最高', icon: '🎯', desc: '需至少 20 题才计', get: r => r.answered >= 20 ? (r.accuracy || 0) : -1 },
+  { key: 'sessions', label: '最活跃', icon: '⚡', desc: '刷题次数', get: r => r.sessions || 0 },
+  { key: 'wrong', label: '错题最多', icon: '📕', desc: '需要多练的题', get: r => r.wrongCount || 0 },
+];
+
+function renderRankTab(m) {
+  // 维度切换
+  const dims = el('div', { class: 'row-flex', style: 'margin-bottom:14px;gap:8px;flex-wrap:wrap' },
+    RANKS.map(d => el('button', {
+      class: 'btn sm ' + (A.rankKey === d.key ? 'pri' : ''),
+      onclick: () => { A.rankKey = d.key; render(); }
+    }, [d.icon + ' ' + d.label]))
+  );
+  m.appendChild(dims);
+
+  const cur = RANKS.find(d => d.key === A.rankKey) || RANKS[0];
+
+  // 排序
+  const rows = A.rows.slice().sort((a, b) => {
+    const d = cur.get(b) - cur.get(a);
+    if (d !== 0) return d;
+    return (b.answered || 0) - (a.answered || 0);
+  });
+
+  if (!rows.length) {
+    m.appendChild(el('div', { class: 'empty' }, ['暂无数据']));
+    return;
+  }
+
+  // 前三名领奖台
+  const top3 = rows.slice(0, 3);
+  const medals = ['🥇', '🥈', '🥉'];
+  const podium = el('div', { class: 'kpis', style: 'margin-bottom:16px' },
+    top3.map((r, i) => el('div', { class: 'kpi ' + (i === 0 ? 'g' : i === 1 ? 'a' : '') }, [
+      el('div', { class: 'v', style: 'font-size:20px' }, [medals[i]]),
+      el('div', { class: 'l', style: 'font-size:13px;color:var(--t1);font-weight:600' }, [r.name || r.username]),
+      el('div', { class: 'l', style: 'font-size:11px' }, [
+        cur.key === 'accuracy'
+          ? (r.answered >= 20 ? `${r.accuracy}% (${r.answered}题)` : '题量不足20')
+          : (cur.key === 'answered' ? `${r.answered} 题`
+          : cur.key === 'sessions' ? `${r.sessions} 次`
+          : `${r.wrongCount} 道`)
+      ]),
+    ]))
+  );
+  m.appendChild(podium);
+
+  // 完整排行表
+  const table = el('table', { class: 'tbl' });
+  table.appendChild(el('thead', {}, [el('tr', {}, [
+    el('th', {}, ['名次']), el('th', {}, ['用户']),
+    el('th', {}, [cur.label]), el('th', {}, ['已答题']),
+    el('th', {}, ['正确率']), el('th', {}, ['刷题次数']),
+    el('th', {}, ['错题']), el('th', {}, ['操作']),
+  ])]));
+  const tbody = el('tbody');
+  rows.forEach((r, i) => {
+    const val = cur.get(r);
+    const noData = cur.key === 'accuracy' && r.answered < 20;
+    tbody.appendChild(el('tr', {}, [
+      el('td', { style: 'font-weight:700;font-size:15px' }, [
+        i < 3 ? medals[i] : String(i + 1),
+      ]),
+      el('td', {}, [
+        el('div', { style: 'font-weight:600' }, [r.name || r.username]),
+        el('div', { style: 'font-size:11px;color:var(--t3)' }, ['@' + r.username]),
+      ]),
+      el('td', { style: 'font-weight:700;color:var(--accent)' }, [
+        noData ? '—' : String(val),
+      ]),
+      el('td', {}, [String(r.answered)]),
+      el('td', {}, [
+        el('span', { style: `color:${(r.accuracy||0) >= 80 ? 'var(--green)' : (r.accuracy||0) >= 60 ? 'var(--orange)' : 'var(--red)'};font-weight:600` }, [(r.accuracy||0) + '%']),
+      ]),
+      el('td', {}, [String(r.sessions)]),
+      el('td', {}, [String(r.wrongCount)]),
+      el('td', {}, [
+        el('button', { class: 'btn sm', onclick: () => showUser(r) }, ['详情']),
+      ]),
+    ]));
+  });
+  table.appendChild(tbody);
+  m.appendChild(table);
+
+  // 手机卡片
+  m.appendChild(el('div', { class: 'cards' }, rows.map((r, i) => {
+    const val = cur.get(r);
+    const noData = cur.key === 'accuracy' && r.answered < 20;
+    return el('div', { class: 'card' }, [
+      el('div', { class: 'row-flex' }, [
+        el('div', { style: 'font-size:18px;width:32px' }, [i < 3 ? medals[i] : String(i + 1)]),
+        el('div', { style: 'flex:1' }, [
+          el('div', { style: 'font-weight:600' }, [r.name || r.username]),
+          el('div', { style: 'font-size:11px;color:var(--t3)' }, ['@' + r.username]),
+        ]),
+        el('div', { style: 'text-align:right' }, [
+          el('div', { style: 'font-weight:700;color:var(--accent);font-size:16px' }, [noData ? '—' : String(val)]),
+          el('div', { style: 'font-size:11px;color:var(--t3)' }, [cur.label]),
+        ]),
+      ]),
+      el('div', { style: 'font-size:12px;color:var(--t3);margin-top:8px' }, [
+        `答题 ${r.answered} · 正确率 ${r.accuracy || 0}% · 刷题 ${r.sessions} 次 · 错题 ${r.wrongCount}`,
+      ]),
+      el('div', { class: 'row-flex', style: 'margin-top:10px;gap:8px' }, [
+        el('button', { class: 'btn sm', onclick: () => showUser(r) }, ['详情']),
+        el('button', { class: 'btn sm', onclick: () => exportWrongCSV(r.username) }, ['⬇ 错题']),
+      ]),
+    ]);
+  })));
+
+  // 导出排行榜
+  m.appendChild(el('div', { style: 'margin-top:16px' }, [
+    el('button', {
+      class: 'btn pri', onclick: () => {
+        const headers = ['名次', '姓名', '用户名', cur.label, '已答题', '答对', '正确率%', '刷题次数', '错题数'];
+        const body = rows.map((r, i) => {
+          const noData = cur.key === 'accuracy' && r.answered < 20;
+          return [i + 1, r.name, r.username, noData ? '' : cur.get(r),
+                  r.answered, r.correct, r.accuracy, r.sessions, r.wrongCount];
+        });
+        const stamp = new Date().toISOString().slice(0, 10);
+        downloadCSV(`安全员排行榜_${cur.label}_${stamp}.csv`, headers, body);
+        toast('排行榜已导出');
+      }
+    }, ['⬇ 导出排行榜 CSV']),
+  ]));
 }
 
 function renderTable() {
@@ -231,14 +465,20 @@ function renderTable() {
 
 async function showUser(r) {
   try {
-    const d = await api('/api/admin/user/progress?username=' + encodeURIComponent(r.username));
-    const p = d.progress;
+    // 后端两代路径都试:新 /api/admin/user/{name},旧 /api/admin/user/progress?username=
+    let d;
+    try {
+      d = await api('/api/admin/user/' + encodeURIComponent(r.username));
+    } catch (e1) {
+      d = await api('/api/admin/user/progress?username=' + encodeURIComponent(r.username));
+    }
+    const stats = d.stats || {};
+    const bySet = stats.bySet || (d.bySet || {});
+    const wrongMap = d.wrong || (d.progress && d.progress.wrong) || {};
+    const wrongKeys = Object.keys(wrongMap);
+    const wrongItems = Object.values(wrongMap).slice(0, 20);
     const box = $('#modalbox') || el('div', { id: 'modalbox' });
     box.innerHTML = '';
-    const stats = (p && p.stats) || {};
-    const bySet = stats.bySet || {};
-    const wrongKeys = p ? Object.keys(p.wrong || {}) : [];
-    const wrongItems = p ? Object.values(p.wrong || {}).slice(0, 20) : [];
 
     const setNames = {
       final: '完整版', q2: '基础版', questions_Qz01: '2000题全集',
@@ -277,8 +517,9 @@ async function showUser(r) {
           el('div', { style: 'font-size:11px;color:var(--t3);margin-top:2px' }, [`正确答案 ${w.a} · 错 ${w.count} 次`]),
         ])),
       ]) : null,
-      !p ? el('div', { class: 'empty' }, ['该用户还没有刷题记录']) : null,
-      el('div', { class: 'row-flex', style: 'margin-top:16px' }, [
+      !wrongKeys.length && !stats.answered ? el('div', { class: 'empty' }, ['该用户还没有刷题记录']) : null,
+      el('div', { class: 'row-flex', style: 'margin-top:16px;gap:8px' }, [
+        wrongKeys.length ? el('button', { class: 'btn sm', onclick: () => exportWrongCSV(r.username) }, ['⬇ 导出错题']) : null,
         el('button', { class: 'btn sm dan', onclick: () => resetProgress(r) }, ['清空该用户进度']),
       ]),
     ]));

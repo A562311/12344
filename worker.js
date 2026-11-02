@@ -481,7 +481,10 @@ async function handle(req, env, url) {
       }
 
       if (sub === 'user/reset-password') {
-        const { hash, salt } = hashPassword(String(body.password || ''));
+        // 兼容两种字段名:newPassword(前端) / password
+        const newPass = String(body.password || body.newPassword || '');
+        if (newPass.length < 6) return json({ error: '密码至少 6 位' }, 400);
+        const { hash, salt } = hashPassword(newPass);
         rec.p = hash;
         rec.salt = salt;
         await saveUsers(env, users);
@@ -513,23 +516,52 @@ async function handle(req, env, url) {
     }
 
     // 用户详情(含错题)
+    // 兼容两种调用:
+    //   GET /api/admin/user/progress?username=xxx   (旧版 Node 路径)
+    //   GET /api/admin/user/xxx                     (新路径)
     if (sub.startsWith('user/') && req.method === 'GET') {
-      const target = sub.slice('user/'.length);
+      let target = sub.slice('user/'.length);
+      if (target === 'progress') {
+        target = url.searchParams.get('username') || '';
+      }
+      if (!target) return json({ error: 'username required' }, 400);
+
       const users = await getUsers(env);
       const rec = users[target];
       if (!rec) return json({ error: '用户不存在' }, 404);
       const prog = await loadProgress(env, target);
       const st = (prog && prog.stats) || {};
+
+      // 扁平结构(Node 版兼容)
+      const flat = {
+        username: target,
+        name: rec.name || target,
+        role: rec.role || 'user',
+        active: !!rec.active,
+        lastLogin: rec.lastLogin || 0,
+        created: rec.created || 0,
+        answered: st.answered || 0,
+        correct: st.correct || 0,
+        accuracy: st.answered ? Math.round((st.correct || 0) / st.answered * 100) : 0,
+        sessions: st.sessions || 0,
+        bySet: st.bySet || {},
+        progressUpdated: prog ? prog.updatedAt : 0,
+      };
+
+      // 新结构(带错题明细)
       return json({
+        ...flat,
         user: publicUser(rec),
         stats: {
-          answered: st.answered || 0,
-          correct: st.correct || 0,
-          accuracy: st.answered ? Math.round((st.correct || 0) / st.answered * 100) : 0,
-          sessions: st.sessions || 0,
+          answered: flat.answered,
+          correct: flat.correct,
+          accuracy: flat.accuracy,
+          sessions: flat.sessions,
+          bySet: flat.bySet,
         },
         wrong: prog ? (prog.wrong || {}) : {},
         fav: prog ? (prog.fav || {}) : {},
+        progress: prog || null,
       }, 200);
     }
 

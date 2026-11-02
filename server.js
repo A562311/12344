@@ -396,12 +396,46 @@ const server = http.createServer(async (req, res) => {
         });
       }
 
-      if (sub === 'user/progress' && req.method === 'GET') {
-        const uname = query.get('username');
+      // 用户详情:新路径 GET /api/admin/user/{username},旧路径 GET /api/admin/user/progress?username=
+      if (sub.startsWith('user/') && req.method === 'GET') {
+        let uname = sub.slice('user/'.length);
+        if (uname === 'progress') uname = query.get('username') || '';
         if (!uname) return json(res, 400, { error: 'username required' });
+
         const p = loadProgress(uname);
-        return json(res, 200, { username: uname, progress: p || null });
+        const st = (p && p.stats) || {};
+        // listUsers() 返回数组,按 username 找
+        const rec = auth.listUsers().find(u => u.username === uname) || null;
+        const flat = {
+          username: uname,
+          name: rec ? (rec.name || uname) : uname,
+          role: rec ? (rec.role || 'user') : 'user',
+          active: rec ? !!rec.active : false,
+          lastLogin: rec ? (rec.lastLogin || 0) : 0,
+          created: rec ? (rec.created || 0) : 0,
+          answered: st.answered || 0,
+          correct: st.correct || 0,
+          accuracy: st.answered ? Math.round((st.correct || 0) / st.answered * 100) : 0,
+          sessions: st.sessions || 0,
+          bySet: st.bySet || {},
+          progressUpdated: p ? p.updatedAt : 0,
+        };
+        return json(res, 200, {
+          ...flat,
+          user: rec,
+          stats: {
+            answered: flat.answered,
+            correct: flat.correct,
+            accuracy: flat.accuracy,
+            sessions: flat.sessions,
+            bySet: flat.bySet,
+          },
+          wrong: p ? (p.wrong || {}) : {},
+          fav: p ? (p.fav || {}) : {},
+          progress: p || null,
+        });
       }
+
 
       if (sub === 'user/active' && req.method === 'POST') {
         const body = await readBody(req);
