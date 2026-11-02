@@ -1,0 +1,15 @@
+# ---- 只跟踪代码,题库数据用 Git LFS 或直接提交(9.8MB 可接受) ----
+node_modules/
+npm-debug.log*
+.env
+.env.local
+
+# 运行时数据(用户表/会话/进度)—— 绝不能提交
+data/_db/
+data/_progress/
+*.tmp
+
+# 本地开发
+.DS_Store
+Thumbs.db
+*.log

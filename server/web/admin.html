@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1216">
+<title>C3 刷题 · 管理后台</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<header class="hdr">
+  <div class="logo">⚙️ C3 刷题后台</div>
+  <button class="ib" id="btn-refresh" title="刷新">🔄</button>
+  <button class="ib" id="btn-theme" title="主题">🌙</button>
+  <a class="ib" href="index.html" title="返回刷题">←</a>
+  <button class="ib" id="btn-logout" title="退出">⎋</button>
+</header>
+
+<main class="wrap" id="main">
+  <div style="padding:40px;text-align:center;color:var(--t2)"><span class="spin"></span> 加载中…</div>
+</main>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   C3 Quiz - Admin Panel
+   ═══════════════════════════════════════════════════════ */
+const API = '';
+const LS_TOKEN = 'c3m-token';
+const LS_THEME = 'c3m-theme';
+
+const A = {
+  token: '',
+  user: null,
+  rows: [],
+  summary: {},
+  tab: 'progress',   // progress | users
+  search: '',
+};
+
+const $ = s => document.querySelector(s);
+const el = (t, a = {}, c = []) => {
+  const e = document.createElement(t);
+  for (const [k, v] of Object.entries(a)) {
+    if (k === 'class') e.className = v;
+    else if (k === 'style') e.style.cssText = v;
+    else if (k === 'html') e.innerHTML = v;
+    else if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2), v);
+    else if (v != null) e.setAttribute(k, v);
+  }
+  for (const x of [].concat(c)) {
+    if (x == null || x === false) continue;
+    const node = (typeof x === 'string' || typeof x === 'number') ? document.createTextNode(String(x)) : x;
+    if (node && node.nodeType) e.appendChild(node);
+  }
+  return e;
+};
+function toast(msg) {
+  const t = el('div', { class: 'toast' }, [msg]);
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2200);
+}
+async function api(path, opts = {}) {
+  const headers = Object.assign({}, opts.headers || {});
+  if (A.token) headers['Authorization'] = 'Bearer ' + A.token;
+  if (opts.body) headers['Content-Type'] = 'application/json';
+  const r = await fetch(API + path, Object.assign({}, opts, { headers }));
+  let data = null;
+  try { data = await r.json(); } catch (e) {}
+  if (!r.ok) {
+    const err = new Error((data && data.error) || ('HTTP ' + r.status));
+    err.status = r.status;
+    throw err;
+  }
+  return data;
+}
+function fmtTime(ts) {
+  if (!ts) return '从未';
+  const d = new Date(ts);
+  const diff = Date.now() - ts;
+  if (diff < 60000) return '刚刚';
+  if (diff < 3600000) return Math.floor(diff / 60000) + ' 分钟前';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + ' 小时前';
+  if (diff < 604800000) return Math.floor(diff / 86400000) + ' 天前';
+  return d.toLocaleDateString('zh-CN');
+}
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  $('#btn-theme').textContent = t === 'dark' ? '🌙' : '☀️';
+  try { localStorage.setItem(LS_THEME, t); } catch (e) {}
+}
+
+// ── 渲染 ──
+function render() {
+  const m = $('#main');
+  m.innerHTML = '';
+
+  if (!A.user) {
+    // 内置登录表单,不用跳来跳去
+    const uname = el('input', { class: 'inp', type: 'text', placeholder: '管理员用户名', id: 'au' });
+    const pass = el('input', { class: 'inp', type: 'password', placeholder: '密码', id: 'ap' });
+    const errBox = el('div', { class: 'err hidden', id: 'aerr' });
+    const btn = el('button', { class: 'btn pri', style: 'width:100%;padding:11px', onclick: adminLogin }, ['登录后台']);
+
+    m.appendChild(el('div', { class: 'card', style: 'max-width:380px;margin:40px auto' }, [
+      el('div', { style: 'font-weight:700;font-size:17px;margin-bottom:4px' }, ['管理员登录']),
+      el('div', { style: 'font-size:13px;color:var(--t2);margin-bottom:16px' }, ['需要管理员账号才能查看刷题进度']),
+      el('div', { style: 'margin-bottom:10px' }, [uname]),
+      el('div', { style: 'margin-bottom:12px' }, [pass]),
+      errBox,
+      btn,
+      el('div', { style: 'margin-top:14px;text-align:center' }, [
+        el('a', { href: 'index.html', style: 'color:var(--accent);font-size:13px;text-decoration:none' }, ['← 返回刷题页']),
+      ]),
+    ]));
+    [uname, pass].forEach(inp => {
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') adminLogin(); });
+    });
+    setTimeout(() => uname.focus(), 50);
+    return;
+  }
+
+  // 顶部信息
+  m.appendChild(el('div', { class: 'row-flex', style: 'margin-bottom:14px' }, [
+    el('div', { style: 'flex:1' }, [
+      el('div', { style: 'font-weight:700;font-size:17px' }, ['管理后台']),
+      el('div', { style: 'font-size:12px;color:var(--t3)' }, [`${A.user.name || A.user.username} · 管理员`]),
+    ]),
+  ]));
+
+  // 汇总卡
+  const s = A.summary;
+  m.appendChild(el('div', { class: 'kpis' }, [
+    kpi(s.users || 0, '注册用户', 'a'),
+    kpi(s.activeUsers || 0, '已登录过', ''),
+    kpi(s.totalAnswered || 0, '累计答题', 'a'),
+    kpi((s.accuracy || 0) + '%', '平均正确率', (s.accuracy || 0) >= 80 ? 'g' : (s.accuracy || 0) >= 60 ? '' : 'r'),
+  ]));
+
+  // Tab
+  m.appendChild(el('div', { class: 'tabs' }, [
+    el('button', { class: 'tab ' + (A.tab === 'progress' ? 'on' : ''), onclick: () => { A.tab = 'progress'; render(); } }, ['📊 刷题进度']),
+    el('button', { class: 'tab ' + (A.tab === 'users' ? 'on' : ''), onclick: () => { A.tab = 'users'; render(); } }, ['👥 用户管理']),
+  ]));
+
+  if (A.tab === 'progress') renderProgressTab(m);
+  else renderUsersTab(m);
+}
+
+function kpi(v, l, c) {
+  return el('div', { class: 'kpi ' + c }, [
+    el('div', { class: 'v' }, [String(v)]),
+    el('div', { class: 'l' }, [l]),
+  ]);
+}
+
+function renderProgressTab(m) {
+  // 搜索
+  const search = el('input', {
+    class: 'inp', placeholder: '搜索用户名或姓名…', value: A.search,
+    oninput: (e) => { A.search = e.target.value; renderTable(); }
+  });
+  m.appendChild(el('div', { style: 'margin-bottom:12px' }, [search]));
+
+  const tableBox = el('div', { id: 'tablebox' });
+  m.appendChild(tableBox);
+  renderTable();
+}
+
+function renderTable() {
+  const box = $('#tablebox');
+  if (!box) return;
+  box.innerHTML = '';
+  const q = A.search.trim().toLowerCase();
+  const rows = A.rows.filter(r =>
+    !q || r.username.toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q)
+  );
+  if (!rows.length) {
+    box.appendChild(el('div', { class: 'empty' }, ['没有匹配的用户']));
+    return;
+  }
+  // 桌面表格
+  const table = el('table', { class: 'tbl' });
+  table.appendChild(el('thead', {}, [el('tr', {}, [
+    el('th', {}, ['用户']), el('th', {}, ['已答题']), el('th', {}, ['正确率']),
+    el('th', {}, ['刷题次数']), el('th', {}, ['错题']), el('th', {}, ['最后登录']),
+    el('th', {}, ['操作']),
+  ])]));
+  const tbody = el('tbody');
+  rows.forEach(r => {
+    tbody.appendChild(el('tr', {}, [
+      el('td', {}, [
+        el('div', { style: 'font-weight:600' }, [r.name || r.username]),
+        el('div', { style: 'font-size:11px;color:var(--t3)' }, ['@' + r.username + (r.role === 'admin' ? ' · 管理员' : '')]),
+      ]),
+      el('td', {}, [String(r.answered)]),
+      el('td', {}, [
+        el('span', { style: `color:${(r.accuracy||0) >= 80 ? 'var(--green)' : (r.accuracy||0) >= 60 ? 'var(--orange)' : 'var(--red)'};font-weight:600` }, [(r.accuracy||0) + '%']),
+        el('div', { style: 'font-size:11px;color:var(--t3)' }, [`${r.correct}/${r.answered}`]),
+      ]),
+      el('td', {}, [String(r.sessions)]),
+      el('td', {}, [String(r.wrongCount)]),
+      el('td', { style: 'font-size:12px;color:var(--t3)' }, [fmtTime(r.lastLogin)]),
+      el('td', {}, [
+        el('button', { class: 'btn sm', onclick: () => showUser(r) }, ['详情']),
+      ]),
+    ]));
+  });
+  table.appendChild(tbody);
+  box.appendChild(table);
+  // 手机卡片
+  box.appendChild(el('div', { class: 'cards' }, rows.map(r => el('div', { class: 'card' }, [
+    el('div', { class: 'row-flex' }, [
+      el('div', { style: 'flex:1' }, [
+        el('div', { style: 'font-weight:600' }, [r.name || r.username]),
+        el('div', { style: 'font-size:11px;color:var(--t3)' }, ['@' + r.username]),
+      ]),
+      el('div', { style: 'text-align:right' }, [
+        el('div', { style: `font-weight:700;color:${(r.accuracy||0) >= 80 ? 'var(--green)' : 'var(--orange)'}` }, [(r.accuracy||0) + '%']),
+        el('div', { style: 'font-size:11px;color:var(--t3)' }, [`${r.answered} 题`]),
+      ]),
+    ]),
+    el('div', { style: 'font-size:12px;color:var(--t3);margin-top:8px' }, [
+      `刷题 ${r.sessions} 次 · 错题 ${r.wrongCount} · 收藏 ${r.favCount} · ${fmtTime(r.lastLogin)}`,
+    ]),
+    el('div', { class: 'row-flex', style: 'margin-top:10px' }, [
+      el('button', { class: 'btn sm', onclick: () => showUser(r) }, ['详情']),
+    ]),
+  ]))));
+}
+
+async function showUser(r) {
+  try {
+    const d = await api('/api/admin/user/progress?username=' + encodeURIComponent(r.username));
+    const p = d.progress;
+    const box = $('#modalbox') || el('div', { id: 'modalbox' });
+    box.innerHTML = '';
+    const stats = (p && p.stats) || {};
+    const bySet = stats.bySet || {};
+    const wrongKeys = p ? Object.keys(p.wrong || {}) : [];
+    const wrongItems = p ? Object.values(p.wrong || {}).slice(0, 20) : [];
+
+    const setNames = {
+      final: '完整版', q2: '基础版', questions_Qz01: '2000题全集',
+      questions_Qz02: '单选专项', questions_Qz03: '多选专项', questions_Qz04: '判断专项',
+      questions_Qz05: '错题精选', questions_Qz06: '数字专题', questions_Qz07: '起重作业',
+      questions_Qz08: '安全生产管理', questions_Qz09: '安全生产许可', questions_Qz10: '事故案例',
+      questions_Qz11: '工伤保险', questions_Qz12: '深基坑墙', questions_Qz13: '消防安全',
+      questions_Qz14: '日内瓦专题', questions_Qz15: '单选综合', sd_c: '山东C类',
+    };
+
+    box.appendChild(el('div', { class: 'mbox' }, [
+      el('div', { class: 'row-flex', style: 'margin-bottom:14px' }, [
+        el('div', { style: 'flex:1' }, [
+          el('div', { style: 'font-weight:700;font-size:16px' }, [r.name || r.username]),
+          el('div', { style: 'font-size:12px;color:var(--t3)' }, ['@' + r.username]),
+        ]),
+        el('button', { class: 'btn sm', onclick: closeModal }, ['✕']),
+      ]),
+      el('div', { class: 'kpis', style: 'margin-bottom:12px' }, [
+        kpi(stats.answered || 0, '答题', 'a'),
+        kpi((stats.answered ? Math.round(stats.correct / stats.answered * 100) : 0) + '%', '正确率', 'g'),
+        kpi(wrongKeys.length, '错题', 'r'),
+      ]),
+      Object.keys(bySet).length ? el('div', {}, [
+        el('h4', { style: 'margin:12px 0 6px;font-size:13px;color:var(--t2)' }, ['各题库刷题量']),
+        ...Object.entries(bySet).map(([k, v]) => el('div', { class: 'row-flex', style: 'font-size:13px;padding:4px 0' }, [
+          el('span', { style: 'flex:1' }, [setNames[k] || k]),
+          el('span', { style: 'color:var(--t3)' }, [`${v.answered} 题`]),
+          el('span', { style: 'font-weight:600;color:var(--green)' }, [`${v.answered ? Math.round(v.correct / v.answered * 100) : 0}%`]),
+        ])),
+      ]) : null,
+      wrongItems.length ? el('div', {}, [
+        el('h4', { style: 'margin:12px 0 6px;font-size:13px;color:var(--t2)' }, [`错题 (${wrongKeys.length})`]),
+        ...wrongItems.map(w => el('div', { style: 'font-size:13px;padding:6px 0;border-top:1px solid var(--sep)' }, [
+          el('div', {}, [(w.q || '').slice(0, 80) + ((w.q || '').length > 80 ? '…' : '')]),
+          el('div', { style: 'font-size:11px;color:var(--t3);margin-top:2px' }, [`正确答案 ${w.a} · 错 ${w.count} 次`]),
+        ])),
+      ]) : null,
+      !p ? el('div', { class: 'empty' }, ['该用户还没有刷题记录']) : null,
+      el('div', { class: 'row-flex', style: 'margin-top:16px' }, [
+        el('button', { class: 'btn sm dan', onclick: () => resetProgress(r) }, ['清空该用户进度']),
+      ]),
+    ]));
+    if (!$('#modalbox')) document.body.appendChild(box);
+    box.classList.remove('hidden');
+  } catch (e) {
+    toast('加载失败: ' + e.message);
+  }
+}
+function closeModal() {
+  const b = $('#modalbox');
+  if (b) b.classList.add('hidden');
+}
+
+function renderUsersTab(m) {
+  const rows = A.rows;
+  m.appendChild(el('div', { class: 'card', style: 'padding:12px 14px;margin-bottom:12px' }, [
+    el('div', { style: 'font-size:13px;color:var(--t2)' }, [
+      `共 ${rows.length} 个用户 · 管理员可禁用/启用账号、重置密码、调整角色`,
+    ]),
+  ]));
+  rows.forEach(r => {
+    m.appendChild(el('div', { class: 'card' }, [
+      el('div', { class: 'row-flex' }, [
+        el('div', { style: 'flex:1;min-width:0' }, [
+          el('div', { style: 'font-weight:600' }, [
+            r.name || r.username,
+            r.role === 'admin' ? el('span', { class: 'tag admin' }, ['管理员']) : null,
+            !r.active ? el('span', { class: 'tag off' }, ['已禁用']) : null,
+          ]),
+          el('div', { style: 'font-size:11px;color:var(--t3);margin-top:2px' }, [
+            '@' + r.username + ' · 注册于 ' + fmtTime(r.created) + ' · 最后登录 ' + fmtTime(r.lastLogin),
+          ]),
+        ]),
+      ]),
+      el('div', { class: 'row-flex', style: 'margin-top:10px' }, [
+        el('button', {
+          class: 'btn sm ' + (r.active ? 'dan' : ''),
+          onclick: () => toggleActive(r)
+        }, [r.active ? '禁用' : '启用']),
+        el('button', { class: 'btn sm', onclick: () => resetPass(r) }, ['重置密码']),
+        el('button', {
+          class: 'btn sm', onclick: () => changeRole(r),
+          disabled: r.username === A.user.username
+        }, [r.role === 'admin' ? '降为普通用户' : '设为管理员']),
+        el('button', {
+          class: 'btn sm dan', onclick: () => delUser(r),
+          disabled: r.username === A.user.username
+        }, ['删除']),
+      ]),
+    ]));
+  });
+}
+
+// ── 操作 ──
+async function toggleActive(r) {
+  try {
+    await api('/api/admin/user/active', { method: 'POST', body: JSON.stringify({ username: r.username, active: !r.active }) });
+    toast(r.active ? '已禁用 ' + r.username : '已启用 ' + r.username);
+    await refresh();
+  } catch (e) { toast('失败: ' + e.message); }
+}
+async function resetPass(r) {
+  const np = prompt(`为 ${r.username} 设置新密码(至少 6 位):`);
+  if (!np) return;
+  try {
+    await api('/api/admin/user/reset-password', { method: 'POST', body: JSON.stringify({ username: r.username, newPassword: np }) });
+    toast('密码已重置');
+  } catch (e) { toast('失败: ' + e.message); }
+}
+async function changeRole(r) {
+  const role = r.role === 'admin' ? 'user' : 'admin';
+  if (!confirm(`将 ${r.username} ${role === 'admin' ? '设为管理员' : '降为普通用户'}?`)) return;
+  try {
+    await api('/api/admin/user/role', { method: 'POST', body: JSON.stringify({ username: r.username, role }) });
+    toast('角色已更新');
+    await refresh();
+  } catch (e) { toast('失败: ' + e.message); }
+}
+async function delUser(r) {
+  if (!confirm(`确定删除用户 ${r.username}?其刷题记录也会删除。`)) return;
+  try {
+    await api('/api/admin/user/delete', { method: 'POST', body: JSON.stringify({ username: r.username }) });
+    toast('用户已删除');
+    await refresh();
+  } catch (e) { toast('失败: ' + e.message); }
+}
+async function resetProgress(r) {
+  if (!confirm(`确定清空 ${r.username} 的全部刷题进度?`)) return;
+  try {
+    await api('/api/admin/user/reset-progress', { method: 'POST', body: JSON.stringify({ username: r.username }) });
+    toast('进度已清空');
+    closeModal();
+    await refresh();
+  } catch (e) { toast('失败: ' + e.message); }
+}
+
+// ── 管理员登录 ──
+async function adminLogin() {
+  const uname = document.getElementById('au')?.value.trim() || '';
+  const pass = document.getElementById('ap')?.value || '';
+  const errBox = document.getElementById('aerr');
+  const show = (m) => { if (errBox) { errBox.textContent = m; errBox.classList.remove('hidden'); } };
+  if (!uname || !pass) { show('请填写用户名和密码'); return; }
+  try {
+    const r = await api('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username: uname, password: pass }),
+    });
+    if (!r.user || r.user.role !== 'admin') {
+      show('该账号不是管理员');
+      return;
+    }
+    A.token = r.token;
+    A.user = r.user;
+    localStorage.setItem(LS_TOKEN, r.token);
+    toast('登录成功');
+    await refresh();
+  } catch (e) {
+    show(e.message || '登录失败');
+  }
+}
+
+// ── 数据 ──
+async function refresh() {
+  try {
+    const d = await api('/api/admin/stats');
+    A.rows = d.rows || [];
+    A.summary = d.summary || {};
+    render();
+  } catch (e) {
+    if (e.status === 401) {
+      A.user = null;
+      render();
+      toast('登录已过期,请重新登录');
+    } else {
+      toast('加载失败: ' + e.message);
+    }
+  }
+}
+
+// ── Init ──
+async function init() {
+  applyTheme((() => { try { return localStorage.getItem(LS_THEME) || 'dark'; } catch (e) { return 'dark'; } })());
+  A.token = localStorage.getItem(LS_TOKEN) || '';
+
+  $('#btn-theme').onclick = () => applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  $('#btn-refresh').onclick = () => refresh();
+  $('#btn-logout').onclick = async () => {
+    try { await api('/api/auth/logout', { method: 'POST' }); } catch (e) {}
+    localStorage.removeItem(LS_TOKEN);
+    location.href = 'index.html';
+  };
+
+  if (!A.token) { render(); return; }
+  try {
+    const r = await api('/api/auth/me');
+    A.user = r.user;
+    if (A.user.role !== 'admin') {
+      A.user = null;
+      render();
+      toast('需要管理员权限');
+      return;
+    }
+    await refresh();
+  } catch (e) {
+    A.user = null;
+    render();
+  }
+}
+init();
+</script>
+</body>
+</html>

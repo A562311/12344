@@ -1,0 +1,19 @@
+name = "c3-quiz"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# 静态资源(题库 + 前端)
+[assets]
+directory = "./web"
+binding = "ASSETS"
+
+# KV 存储(用户表 / 会话 / 进度)
+# 创建: wrangler kv namespace create C3_KV
+# 把返回的 id 填到下面
+[[kv_namespaces]]
+binding = "C3_KV"
+id = "REPLACE_WITH_YOUR_KV_ID"
+
+[observability]
+enabled = true

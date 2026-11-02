@@ -1,0 +1,121 @@
+name: C3 Quiz
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: 测试 + 构建校验
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # ── 题库完整性 ──
+      - name: 校验题库
+        run: |
+          cd server
+          node -e "
+          const fs=require('fs');
+          const files=fs.readdirSync('data').filter(f=>f.endsWith('.json'));
+          let total=0;
+          for(const f of files){
+            try{
+              const j=JSON.parse(fs.readFileSync('data/'+f,'utf-8'));
+              const n = Array.isArray(j) ? j.length
+                    : (Array.isArray(j.questions) ? j.questions.length : Object.keys(j).length);
+              total+=n;
+              console.log('  '+f+': '+n);
+            }catch(e){ console.error('  !! '+f+' 解析失败: '+e.message); process.exit(1); }
+          }
+          console.log('  ---- 合计: '+total+' 题 ----');
+          if(total<1000){ console.error('题库数量异常'); process.exit(1); }
+          "
+
+      # ── 启动 + 冒烟 ──
+      - name: 冒烟测试
+        run: |
+          cd server
+          node server.js &
+          sleep 3
+          for ep in /api/health / /admin.html /api/sets; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8787$ep")
+            echo "  $ep -> $code"
+            [ "$code" = "200" ] || { echo "FAIL $ep"; exit 1; }
+          done
+          curl -sf http://127.0.0.1:8787/api/health | grep -q '"ok":true'
+          echo "  所有端点 OK"
+
+      # ── 注册/登录/越权 ──
+      - name: Auth 流程测试
+        run: |
+          cd server
+          node server.js &
+          sleep 2
+          node -e "
+          const B='http://127.0.0.1:8787';
+          const call=async(m,p,b,t)=>{
+            const h={'Content-Type':'application/json'};
+            if(t) h['Authorization']='Bearer '+t;
+            const r=await fetch(B+p,{method:m,headers:h,body:b?JSON.stringify(b):undefined});
+            let j; try{j=await r.json()}catch(e){j={}}
+            return {s:r.status,j};
+          };
+          (async()=>{
+            let r=await call('POST','/api/auth/register',{username:'ci_test',password:'pass123456',name:'CI'});
+            if(r.s!==200){ console.error('注册失败',r.s,r.j); process.exit(1); }
+            console.log('  注册 OK');
+
+            r=await call('POST','/api/auth/login',{username:'ci_test',password:'pass123456'});
+            if(r.s!==200||!r.j.token){ console.error('登录失败',r.s,r.j); process.exit(1); }
+            const tok=r.j.token; console.log('  登录 OK');
+
+            r=await call('POST','/api/progress',{stats:{answered:5,correct:4,sessions:1}},tok);
+            if(r.s!==200){ console.error('进度保存失败'); process.exit(1); }
+            console.log('  进度保存 OK');
+
+            // 越权:普通用户不能访问 admin
+            r=await call('GET','/api/admin/stats',null,tok);
+            if(r.s!==403&&r.s!==401){ console.error('越权未拦截!',r.s); process.exit(1); }
+            console.log('  越权拦截 OK ('+r.s+')');
+
+            // 管理员能访问
+            r=await call('POST','/api/auth/login',{username:'admin',password:'admin123'});
+            if(r.s===200&&r.j.token){
+              const st=await call('GET','/api/admin/stats',null,r.j.token);
+              if(st.s!==200){ console.error('admin/stats 失败',st.s); process.exit(1); }
+              console.log('  管理员接口 OK');
+            } else {
+              console.log('  (admin 密码已被改,跳过管理员接口测试)');
+            }
+            console.log('  ---- Auth 全部通过 ----');
+          })().catch(e=>{console.error(e);process.exit(1);});
+          "
+
+      # ── Docker 构建 ──
+      - name: 构建 Docker 镜像
+        run: |
+          cd server
+          docker build -t c3-quiz:${{ github.sha }} .
+          docker images | grep c3-quiz
+
+  deploy-render:
+    needs: test
+    runs-on: ubuntu-latest
+    name: 通知 Render 部署
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: 触发 Render 部署钩子
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "  未配置 RENDER_DEPLOY_HOOK,跳过(Render 的 GitHub 自动集成已够用)"
+            exit 0
+          fi
+          curl -sf -X POST "$RENDER_DEPLOY_HOOK" && echo "  触发成功" || echo "  触发失败"

@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: c3-quiz
+    runtime: node
+    plan: free
+    buildCommand: echo "no build needed"
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: 8787
+      - key: HOST
+        value: 0.0.0.0
+      # CHANGE THESE BEFORE DEPLOY
+      - key: ADMIN_USER
+        sync: false
+      - key: ADMIN_PASS
+        sync: false
+    disk:
+      name: progress
+      mountPath: /app/data/_progress
+      sizeGB: 1

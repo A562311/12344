@@ -1,0 +1,19 @@
+{
+  "name": "C3 安全员刷题",
+  "short_name": "C3刷题",
+  "description": "建筑施工企业综合类专职安全生产管理人员(C3)考试刷题工具",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1216",
+  "theme_color": "#0f1216",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

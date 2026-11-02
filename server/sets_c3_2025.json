@@ -1,0 +1,146 @@
+[
+  {
+    "file": "data/questions_Final.json",
+    "name": "final",
+    "label": "2025-2026 安全员C3 · 完整版",
+    "count": 994,
+    "desc": "单选/多选/判断 · 994题 · AI解析+记忆技巧",
+    "has_analysis": true
+  },
+  {
+    "file": "data/questions_2.json",
+    "name": "q2",
+    "label": "2025-2026 安全员C3 · 基础版",
+    "count": 994,
+    "desc": "单选/多选/判断 · 994题（无解析）",
+    "has_analysis": false
+  },
+  {
+    "file": "data/questions_Qz01.json",
+    "name": "questions_Qz01",
+    "label": "2025-2026 安全员C3 · 2000题全集",
+    "count": 1000,
+    "desc": "单选400 / 多选200 / 判断400",
+    "has_analysis": false
+  },
+  {
+    "file": "data/questions_Qz02.json",
+    "name": "questions_Qz02",
+    "label": "2025-2026 安全员C3 · 单选专项",
+    "count": 400,
+    "desc": "单选 400题",
+    "has_analysis": false
+  },
+  {
+    "file": "data/questions_Qz03.json",
+    "name": "questions_Qz03",
+    "label": "2025-2026 安全员C3 · 多选专项",
+    "count": 200,
+    "desc": "多选 200题 · AI解析",
+    "has_analysis": true
+  },
+  {
+    "file": "data/questions_Qz04.json",
+    "name": "questions_Qz04",
+    "label": "2025-2026 安全员C3 · 判断专项",
+    "count": 400,
+    "desc": "判断 400题 · AI解析",
+    "has_analysis": true
+  },
+  {
+    "file": "data/questions_Qz05.json",
+    "name": "questions_Qz05",
+    "label": "2025-2026 安全员C3 · 错题精选",
+    "count": 212,
+    "desc": "212题 · 含AI解析",
+    "has_analysis": true
+  },
+  {
+    "file": "data/questions_Qz06.json",
+    "name": "questions_Qz06",
+    "label": "2025-2026 安全员C3 · 数字专题",
+    "count": 90,
+    "desc": "90题 · 数字答案",
+    "has_analysis": true
+  },
+  {
+    "file": "data/questions_Qz07.json",
+    "name": "questions_Qz07",
+    "label": "2025-2026 安全员C3 · 起重作业",
+    "count": 34,
+    "desc": "34题 · AI解析",
+    "has_analysis": true
+  },
+  {
+    "file": "data/questions_Qz08.json",
+    "name": "questions_Qz08",
+    "label": "2025-2026 安全员C3 · 安全生产管理",
+    "count": 58,
+    "desc": "58题 · AI解析",
+    "has_analysis": true
+  },
+  {
+    "file": "data/questions_Qz09.json",
+    "name": "questions_Qz09",
+    "label": "2025-2026 安全员C3 · 安全生产许可",
+    "count": 24,
+    "desc": "24题 · AI解析",
+    "has_analysis": true
+  },
+  {
+    "file": "data/questions_Qz10.json",
+    "name": "questions_Qz10",
+    "label": "2025-2026 安全员C3 · 事故案例",
+    "count": 114,
+    "desc": "114题 · 单选/多选 · AI解析",
+    "has_analysis": true
+  },
+  {
+    "file": "data/questions_Qz11.json",
+    "name": "questions_Qz11",
+    "label": "2025-2026 安全员C3 · 工伤保险",
+    "count": 23,
+    "desc": "23题 · AI解析",
+    "has_analysis": true
+  },
+  {
+    "file": "data/questions_Qz12.json",
+    "name": "questions_Qz12",
+    "label": "2025-2026 安全员C3 · 深基坑墙",
+    "count": 40,
+    "desc": "40题 · AI解析",
+    "has_analysis": true
+  },
+  {
+    "file": "data/questions_Qz13.json",
+    "name": "questions_Qz13",
+    "label": "2025-2026 安全员C3 · 消防安全",
+    "count": 57,
+    "desc": "57题 · 多选为主 · AI解析",
+    "has_analysis": true
+  },
+  {
+    "file": "data/questions_Qz14.json",
+    "name": "questions_Qz14",
+    "label": "2025-2026 安全员C3 · 日内瓦专题",
+    "count": 16,
+    "desc": "16题 · AI解析",
+    "has_analysis": true
+  },
+  {
+    "file": "data/questions_Qz15.json",
+    "name": "questions_Qz15",
+    "label": "2025-2026 安全员C3 · 单选综合",
+    "count": 400,
+    "desc": "单选 400题 · AI解析",
+    "has_analysis": true
+  },
+  {
+    "file": "data/questions_SD_C.json",
+    "name": "sd_c",
+    "label": "山东省 · C类 专职安全生产管理人员(官方 2020)",
+    "count": 1824,
+    "desc": "单选 813 + 多选 429 + 判断 582 题 · 山东省住建厅 2020 官方题库",
+    "has_analysis": false
+  }
+]
