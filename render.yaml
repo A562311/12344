@@ -11,12 +11,11 @@ services:
         value: 8787
       - key: HOST
         value: 0.0.0.0
-      # ⚠️ 部署前必须改 —— Render 后台填,不要写在这里
+      # ⚠️ 部署后必须在 Render 后台填,不要写在这里
       - key: ADMIN_USER
         sync: false
       - key: ADMIN_PASS
         sync: false
-    disk:
-      name: progress
-      mountPath: /app/data/_progress
-      sizeGB: 1
+    # 注意:free 套餐不支持 disk。
+    # 刷题进度存在容器的 data/_progress,容器重启会丢 —— 可接受。
+    # 需要持久化请升级到 paid 套餐并加回 disk 配置。
