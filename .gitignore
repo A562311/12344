@@ -12,3 +12,6 @@ data/_progress/
 Thumbs.db
 *.log
 public/data/
+
+# Pages 构建产物
+pages_build/
