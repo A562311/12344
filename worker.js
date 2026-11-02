@@ -310,8 +310,12 @@ async function handle(req, env, url) {
     return json({ sets, total });
   }
 
-  // --- 取题 ---
+  // --- 取题(必须登录) ---
   if (p.startsWith('/api/questions/')) {
+    // 未登录不给题目 —— 保证每个刷题记录都能归属到具体用户
+    const authUser = await userFromToken(env, getToken(req, url));
+    if (!authUser) return json({ error: '请先登录' }, 401);
+
     const rest = p.slice('/api/questions/'.length);
     const bank = rest.split('/')[0];
     const isRandom = rest.endsWith('/random');

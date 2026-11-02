@@ -251,6 +251,10 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname.startsWith('/api/questions/')) {
+      // 未登录不给题目 —— 保证每个刷题记录都能归属到具体用户
+      const authUser = auth.userFromToken(getToken(req, query));
+      if (!authUser) return json(res, 401, { error: '请先登录' });
+
       const rest = pathname.slice('/api/questions/'.length);
       const [name, sub] = rest.split('/');
       const sets = loadSets();

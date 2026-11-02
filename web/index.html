@@ -330,7 +330,13 @@ function applyTheme(t) {
 }
 
 // ── 视图 ──
-function go(v) { S.view = v; render(); updateBadges(); }
+function go(v) {
+  // 未登录时只允许停在登录页
+  if (!S.user && v !== 'auth') {
+    v = 'auth';
+  }
+  S.view = v; render(); updateBadges();
+}
 function updateBadges() {
   const w = Object.keys(S.wrong).length, f = Object.keys(S.fav).length;
   const bw = $('#badge-wrong'), bf = $('#badge-fav');
@@ -343,6 +349,13 @@ function render() {
   m.innerHTML = '';
   const dock = $('#dock');
   dock.classList.add('hidden');
+  // 未登录 → 一律显示登录页(最后一道防线)
+  if (!S.user) {
+    S.view = 'auth';
+    renderAuth(m);
+    try { window.scrollTo(0, 0); } catch (e) {}
+    return;
+  }
   if (S.view === 'auth') renderAuth(m);
   else if (S.view === 'home') renderHome(m);
   else if (S.view === 'quiz') renderQuiz(m);
@@ -394,9 +407,11 @@ function renderAuth(m) {
   card.appendChild(errBox);
   card.appendChild(btn);
 
-  card.appendChild(el('div', { style: 'margin-top:14px;text-align:center;font-size:13px;color:var(--t3)' }, [
-    '也可以 ',
-    el('a', { href: '#', style: 'color:var(--accent)', onclick: (e) => { e.preventDefault(); skipLogin(); } }, ['不登录直接刷题']),
+  card.appendChild(el('div', {
+    style: 'margin-top:16px;padding:12px;border-radius:var(--r-md);background:var(--bg3);font-size:12px;color:var(--t3);line-height:1.7'
+  }, [
+    '登录后才能刷题。', el('br'),
+    '每个账号的刷题记录独立保存,管理员可在后台看到每个人的进度。'
   ]));
 
   m.appendChild(card);
@@ -452,9 +467,8 @@ function showAuthErr(msg) {
 }
 
 function skipLogin() {
-  S.token = ''; S.user = null;
-  saveLocal();
-  go('home');
+  // 已废弃:现在必须登录才能刷题
+  go('auth');
 }
 
 async function doLogout() {
@@ -524,6 +538,12 @@ function kpi(v, l, c) { return el('div', { class: 'kpi ' + c }, [el('div', { cla
 
 // ── 开始刷题 ──
 async function startBank(set, mode = 'instant') {
+  // 未登录直接跳登录页 —— 必须登录才能刷题
+  if (!S.user || !S.token) {
+    toast('请先登录再刷题');
+    go('auth');
+    return;
+  }
   S.mode = mode;
   S.log = []; S.idx = 0; S.answered = 0; S.correct = 0;
   S.bank = set;
@@ -533,7 +553,15 @@ async function startBank(set, mode = 'instant') {
     S.questions = r.questions;
     go('quiz');
   } catch (e) {
-    // 回退:直接读本地 JSON(离线模式,文件在 quiz/data/ 下)
+    // 401:登录失效 → 回登录页
+    if (e.status === 401) {
+      S.token = ''; S.user = null;
+      saveLocal();
+      toast('登录已失效,请重新登录');
+      go('auth');
+      return;
+    }
+    // 其他错误:尝试本地题库(离线兜底,仅限已登录用户)
     try {
       const meta = await (await fetch('sets_c3_2025.json')).json();
       const m = meta.find(x => x.name === set.n);
@@ -835,6 +863,14 @@ async function init() {
       S.token = ''; S.user = null;
       saveLocal();
     }
+  }
+
+  // 未登录 → 只显示登录/注册页,不给刷题入口
+  if (!S.user) {
+    S.view = 'auth';
+    updateBadges();
+    render();
+    return;
   }
 
   updateBadges();
