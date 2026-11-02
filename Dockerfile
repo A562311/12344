@@ -1,5 +1,6 @@
 # C3 Quiz - 单容器部署
 # 支持 Render / Railway / Fly.io / 任意 Docker 主机
+# 构建上下文 = 仓库根目录
 FROM node:20-alpine
 
 WORKDIR /app

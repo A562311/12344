@@ -11,7 +11,7 @@ services:
         value: 8787
       - key: HOST
         value: 0.0.0.0
-      # CHANGE THESE BEFORE DEPLOY
+      # ⚠️ 部署前必须改 —— Render 后台填,不要写在这里
       - key: ADMIN_USER
         sync: false
       - key: ADMIN_PASS

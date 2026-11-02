@@ -1,163 +1,164 @@
-# C3 安全员刷题 — 完整工具
+<div align="center">
 
-建筑施工企业综合类专职安全生产管理人员(C3)考试刷题工具。
+# C3 安全员刷题
 
-**18 个题库 · 6880 道题** · 手机/电脑都能刷 · 带后台管理
+建筑施工企业综合类专职安全生产管理人员(C3)考试刷题工具
+**18 个题库 · 6880 道题** · 手机/电脑都能刷 · 带管理后台
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/A562311/12344)
+
+</div>
 
 ---
 
-## 快速开始
+## 一键部署(Render,免费)
 
-### 方式 ① 一键公网(推荐,同事随时随地刷 + 你看后台)
+点上面的按钮,或访问 [render.com](https://render.com):
 
-**双击 `启动公网服务.bat`**,等 10-20 秒,窗口里出现一个网址,发给同事即可。
+1. 用 **GitHub 账号**登录
+2. 选这个仓库
+3. 点 **Create Web Service**
 
-- 不需要云账号 / 服务器 / 备案 / 付费
-- 同事手机浏览器直接打开,可"添加到主屏幕"当 App
-- 你开 `网址/admin.html` 看所有同事的刷题进度
-- ⚠️ 关窗口就断服务;地址每次启动会变
+`render.yaml` 已经写好所有配置,一般不用改。
 
-详见 `没有服务器怎么办.md`
+### ⚠️ 部署后必须设置管理员密码
 
-### 方式 ② 局域网(同一 WiFi)
+Render 后台 → **Environment** → 加两个变量:
 
-双击 `server/启动局域网服务.bat` → 窗口显示局域网地址 → 同事手机连同一 WiFi 访问。
+```
+ADMIN_USER = 你想要的管理员用户名
+ADMIN_PASS = 你的密码(至少 6 位)
+```
 
-### 方式 ③ 单机 EXE(发给不需要后台的朋友)
+点 **Save & Deploy**。管理员账号在首次启动时自动创建。
 
-双击 `C3安全员刷题.exe` —— 自带运行时,零配置。
+> 免费版 15 分钟无访问会休眠,有人访问自动唤醒(第一次要等 30-50 秒)。
 
-### 方式 ④ 云端部署(有账号时)
+---
 
-看 `server/DEPLOY.md` —— Render / Docker / 局域网都支持。
+## 三个入口
+
+| 用途 | 地址 |
+|---|---|
+| 刷题页 | `https://<你的域名>.onrender.com/` |
+| 管理后台 | `https://<你的域名>.onrender.com/admin.html` |
+| 健康检查 | `https://<你的域名>.onrender.com/api/health` |
 
 ---
 
 ## 功能
 
 ### 刷题
-- 18 个题库 / 6880 道题(含**山东省 C 类官方题库 1824 题**)
-- 单选 / 多选 / 判断三种题型
-- 即时判分 + AI 解析(部分题库有双层解析)
-- 错题本:答错自动归集,**答对 N 次自动移除**(可设置)
-- 收藏夹 ⭐
-- 学习统计:累计正确率 + 按题库
-- 亮/暗主题
-- PWA:添加到主屏幕,全屏无地址栏
-- 键盘快捷键:`A`-`E` 选答案,`←` `→` 翻题
+
+- 18 个题库,共 6880 道题(含从山东省题库 PDF 解析的 1824 道)
+- 三种模式:**即时** / **考试**(计时模拟)/ **看题**(自动翻页)
+- 错题本、收藏、进度统计
+- PWA —— 可"添加到主屏幕"当 App,全屏无地址栏
+- 离线回退 —— 后端挂了自动用本地缓存,刷题不中断
+- 手机省流量 —— 首屏只下 2.1KB 题库索引,分批取题
 
 ### 账号
-- 注册 / 登录 / 登出
-- 密码 scrypt 哈希(不存明文)
-- Token 会话,30 天过期
-- **进度云同步** —— 换手机不丢
-- 未登录也能刷(进度只存本机)
 
-### 后台管理(`/admin.html`)
-- **刷题进度总览**:每个同事的答题数、正确率、刷题次数、错题数、最后登录
-- 搜索过滤(按用户名/姓名)
-- **用户详情**:各题库刷题量 + 错题清单
-- **用户管理**:禁用/启用、重置密码、调整角色、删除用户
-- 全站汇总:总用户数、总答题量、平均正确率
+- 自助注册(用户名 + 密码 + 姓名)
+- 进度按用户隔离,换设备不丢
+- 登录后进度自动同步到云端
+
+### 管理后台
+
+- 刷题进度看板:答题数、正确率、刷题次数、错题数、最后登录
+- 汇总统计:总用户数、已登录人数、累计答题、平均正确率
+- 用户详情:各题库刷题量 + 错题清单(题干、正确答案、错了几次)
+- 用户管理:禁用/启用、重置密码、设为管理员/降级、删除
+- 搜索过滤
 
 ---
 
-## 默认账号
+## 接口
 
-| 账号 | 密码 | 说明 |
-|---|---|---|
-| `admin` | `admin123` | 管理员 —— **部署前务必改** |
+### 公开
 
-改法:部署时设环境变量 `ADMIN_USER` / `ADMIN_PASS`,或登录后台后用"重置密码"改自己的。
+| 接口 | 说明 |
+|---|---|
+| `GET /api/health` | 健康检查 |
+| `GET /api/sets` | 题库索引(2.1 KB) |
+| `GET /api/questions/:bank?page&size&shuffle` | 分页取题 |
+| `GET /api/questions/:bank/random?count` | 随机组卷 |
 
-同事账号:让他们自己在刷题页点"登录 / 注册"自助创建,或你在后台创建。
+### 需登录
+
+| 接口 | 说明 |
+|---|---|
+| `POST /api/auth/register` | 注册 |
+| `POST /api/auth/login` | 登录 → 返回 token |
+| `POST /api/auth/logout` | 登出 |
+| `GET /api/auth/me` | 当前用户 |
+| `GET /api/progress` | 读进度 |
+| `POST /api/progress` | 存进度 |
+
+### 需管理员
+
+| 接口 | 说明 |
+|---|---|
+| `GET /api/admin/users` | 用户列表 + 进度 |
+| `GET /api/admin/stats` | 汇总统计 |
+| `GET /api/admin/user/:username` | 用户详情(含错题) |
+| `POST /api/admin/user/active` | 禁用/启用 |
+| `POST /api/admin/user/role` | 设管理员/降级 |
+| `POST /api/admin/user/reset-password` | 重置密码 |
+| `POST /api/admin/user/reset-progress` | 清空进度 |
+| `POST /api/admin/user/delete` | 删除用户 |
+
+---
+
+## 安全
+
+| 项 | 实现 |
+|---|---|
+| 密码 | scrypt(N=16384) + 32B 随机 salt,不存明文 |
+| 密码比对 | `timingSafeEqual` 恒定时间 |
+| Token | 32B 随机,DB 里只存 sha256 |
+| 会话 | 30 天过期,每小时清理 |
+| 越权 | 每个 admin 接口校验 role |
+| 进度隔离 | uid 强制取登录用户名,伪造无效 |
+| 目录穿越 | uid 过滤 + 路径 normalize + 前缀校验 |
+| 原子写 | 先写 `.tmp` 再 rename |
+| 静态资源 | ETag / 304 |
+
+---
+
+## 本地运行
+
+```bash
+node server.js          # http://127.0.0.1:8787
+```
+
+改管理员密码(首次启动前):
+```bash
+ADMIN_USER=admin ADMIN_PASS=你的密码 node server.js
+```
 
 ---
 
 ## 目录结构
 
 ```
-C3安全员刷题/
-├── C3安全员刷题.exe          ← 方式 ③
-├── 启动C3刷题.bat / 停止C3刷题.bat / 创建桌面快捷方式.bat
-├── README.md
-├── quiz/                      ← 旧版单机网页(功能少,备用)
-│   ├── quiz-pro.html
-│   └── data/                  ← 18 个题库 JSON
-└── server/                    ← 方式 ① + ②
-    ├── server.js              ← 后端 API(零依赖)
-    ├── auth.js                ← 认证 + 权限
-    ├── package.json
-    ├── Dockerfile / render.yaml
-    ├── DEPLOY.md              ← 部署详解
-    ├── 启动局域网服务.bat / 停止服务.bat
-    ├── data/                  ← 18 个题库 JSON (9.8MB)
-    └── web/
-        ├── index.html         ← 刷题页(移动端优化)
-        ├── admin.html         ← 后台管理
-        ├── admin.css
-        ├── manifest.json      ← PWA
-        └── icon.svg
+.
+├── server.js            # 主服务(零依赖 Node)
+├── auth.js              # 用户/会话/密码
+├── store.js             # 存储适配层(Node fs / Cloudflare KV)
+├── worker.js            # Cloudflare Workers 入口
+├── data/                # 18 个题库 JSON (9.8MB)
+├── web/                 # 前端(index.html / admin.html / admin.css)
+├── Dockerfile           # 单容器部署
+├── render.yaml          # Render 部署配置
+├── wrangler.toml        # Cloudflare Workers 配置
+├── .github/workflows/   # CI(题库校验 + 冒烟 + auth 流程 + Docker)
+└── push_to_github.py    # 一键推送脚本
 ```
 
----
-
-## 三种方式对比
-
-| | ① 一键公网 | ② 局域网 | ③ EXE |
-|---|---|---|---|
-| 手机可用 | ✅ 任何地方 | ✅ 同一 WiFi | ❌ 只电脑 |
-| 需要账号 | ❌ | ❌ | ❌ |
-| 需要服务器 | ❌ | ❌ | ❌ |
-| 需要 Node.js | ✅ | ✅ | ❌ |
-| 同事注册 | ✅ | ✅ | ❌ |
-| 后台管理 | ✅ | ✅ | ❌ |
-| 进度同步 | ✅ 云端 | ✅ 本机 | ✅ 本机 |
-| 网址固定 | ❌ 每次变 | ✅ 固定 | - |
-| 需要电脑常开 | ✅ | ✅ | ❌ |
-
-> **想在手机刷 + 看同事进度 → 选 ①。**
-> **EXE 是给"不方便部署"的朋友的** —— 他自己刷自己的,没有后台。
+零运行时依赖 —— 只需要 Node.js 18+。
 
 ---
 
-## 数据存储
-
-| | 位置 | 换设备 |
-|---|---|---|
-| 用户/会话 | `server/data/_db/*.json` | — |
-| 刷题进度 | `server/data/_progress/<用户名>.json` | ✅ 云端自动同步 |
-
-**备份**:`tar czf backup.tar.gz server/data/ server/sets_c3_2025.json`
-
----
-
-## 常见问题
-
-**Q: 后台提示"需要管理员登录"?**
-A: 用管理员账号在 `/admin.html` 登录。默认 `admin` / `admin123`(建议改掉)
-
-**Q: 同事注册的账号在后台看不到?**
-A: 刷新后台页面(右上角 🔄)
-
-**Q: 同事的进度看不到?**
-A: 他必须**登录后**刷题。未登录的进度只存他本机,后台上不了
-
-**Q: 手机浏览器打开是白的?**
-A: 后端没起来。`curl http://<地址>/api/health` 验证
-
-**Q: 局域网手机打不开?**
-A: 1) 防火墙放行 Node 2) 手机电脑同一 WiFi 3) `ipconfig` 查对 IP
-
-**Q: 想加新题库?**
-A: JSON 放进 `server/data/`,`sets_c3_2025.json` 加一条索引,重启
-
-**Q: Render 免费版会休眠?**
-A: 会。15 分钟无访问就睡,首次唤醒约 30 秒。要常开就用付费版或别的平台
-
----
-
-## 来源
-
-- 山东省 C 类 1824 题:山东省住建厅 2020 官方题库 PDF
-- 其他 17 个题库 5056 题:[linbenyi/Construction-Safety-Officer](https://github.com/linbenyi/Construction-Safety-Officer)(开源,含 AI 解析)
+题库来源:[linbenyi/Construction-Safety-Officer](https://github.com/linbenyi/Construction-Safety-Officer)
+(另含从山东省安全员考试 PDF 解析的 1824 道题)
