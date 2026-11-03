@@ -34,6 +34,11 @@ jobs:
           }
           console.log('  ---- 合计: '+total+' 题 ----');
           if(total<1000){ console.error('题库数量异常'); process.exit(1); }
+          if(total!==7360){ console.error('总题数应为 7360,实际 '+total); process.exit(1); }
+          // 山东C类必须完整提取(2304 题)
+          const sd=JSON.parse(fs.readFileSync('data/questions_SD_C.json','utf-8'));
+          if(sd.length!==2304){ console.error('山东C类应为 2304 题,实际 '+sd.length); process.exit(1); }
+          console.log('  ✅ 题库完整性校验通过 (总 7360 / 山东C类 2304)');
           "
 
       # ── 启动 + 冒烟 ──
