@@ -102,7 +102,7 @@ async function ensureAdmin(env) {
   const users = await getUsers(env);
   const adminUser = env.ADMIN_USER || 'admin';
   if (!users[adminUser]) {
-    const { hash, salt } = hashPassword(env.ADMIN_PASS || 'admin123');
+    const { hash, salt } = hashPassword(env.ADMIN_PASS || 'C3@Quiz2026');
     users[adminUser] = {
       u: adminUser,
       p: hash,

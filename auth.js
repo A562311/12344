@@ -82,7 +82,7 @@ function ensureAdmin() {
   const users = getUsers();
   const adminUser = process.env.ADMIN_USER || 'admin';
   if (!users[adminUser]) {
-    const { hash, salt } = hashPassword(process.env.ADMIN_PASS || 'admin123');
+    const { hash, salt } = hashPassword(process.env.ADMIN_PASS || 'C3@Quiz2026');
     users[adminUser] = {
       u: adminUser,
       p: hash,
